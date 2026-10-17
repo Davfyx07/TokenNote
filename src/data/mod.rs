@@ -1,10 +1,12 @@
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
+use crate::config::ProviderConfig;
+
 /// Representa una métrica de límite de tokens o cuota (ej: 5 horas o Semanal).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UsageLimit {
-    /// Nombre descriptivo del límite: "Sesión (5h)" o "Semanal"
+    /// Etiqueta corta que se muestra junto al %: "5h", "sem", "$4.20", "12k tok"
     pub name: String,
     
     /// Porcentaje consumido (0.0 a 100.0)
@@ -42,8 +44,35 @@ pub struct AiProviderUsage {
     pub status_message: Option<String>,
 }
 
+impl AiProviderUsage {
+    /// Estado "no disponible" con un mensaje para mostrar en la tarjeta
+    pub fn error(provider_id: &str, display_name: &str, message: String) -> Self {
+        Self {
+            provider_id: provider_id.to_string(),
+            display_name: display_name.to_string(),
+            short_limit: None,
+            weekly_limit: None,
+            is_available: false,
+            status_message: Some(message),
+        }
+    }
+}
+
 pub mod claude;
 pub mod codex;
+pub mod deepseek;
+pub mod opencode;
+pub mod openrouter;
+
+/// Consulta un provider agregado desde la configuración
+pub async fn fetch_configured(p: &ProviderConfig) -> AiProviderUsage {
+    match p.kind.as_str() {
+        "deepseek" => deepseek::fetch_deepseek_usage(&p.api_key, p.budget).await,
+        "openrouter" => openrouter::fetch_openrouter_usage(&p.api_key).await,
+        "opencode" => opencode::fetch_opencode_usage(p.budget),
+        other => AiProviderUsage::error(other, p.display_name(), "Tipo desconocido".to_string()),
+    }
+}
 
 /// Convierte un timestamp Unix en segundos a una cadena legible de tiempo restante
 /// Por ejemplo: "5d 12h", "3h 45m", o "Listo" si ya pasó la fecha de reinicio.

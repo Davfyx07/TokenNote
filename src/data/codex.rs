@@ -119,7 +119,7 @@ pub fn fetch_codex_usage() -> AiProviderUsage {
                 };
 
                 UsageLimit {
-                    name: "Sesión 5h".to_string(),
+                    name: "5h".to_string(),
                     used_percent: p.used_percent,
                     remaining_percent: remaining,
                     resets_at: p.resets_at,
@@ -137,7 +137,7 @@ pub fn fetch_codex_usage() -> AiProviderUsage {
                 };
 
                 UsageLimit {
-                    name: "Semanal".to_string(),
+                    name: "sem".to_string(),
                     used_percent: s.used_percent,
                     remaining_percent: remaining,
                     resets_at: s.resets_at,

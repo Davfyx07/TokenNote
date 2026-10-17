@@ -48,21 +48,34 @@ impl ProviderCardWidgets {
         });
 
         // Logo de la IA en el centro del aro (embebido en el binario)
-        let logo: &'static [u8] = match data.borrow().provider_id.as_str() {
-            "claude" => include_bytes!("../../assets/claude.png"),
-            _ => include_bytes!("../../assets/gpt.png"),
+        let logo: Option<&'static [u8]> = match data.borrow().provider_id.as_str() {
+            "claude" => Some(include_bytes!("../../assets/claude.png")),
+            "codex" => Some(include_bytes!("../../assets/gpt.png")),
+            _ => None,
         };
         let ring_overlay = Overlay::new();
         ring_overlay.set_halign(gtk4::Align::Center);
         ring_overlay.set_child(Some(&ring_area));
-        match gdk::Texture::from_bytes(&glib::Bytes::from_static(logo)) {
-          Err(e) => tracing::warn!("No se pudo cargar el logo: {}", e),
-          Ok(texture) => {
+        match logo.map(|l| gdk::Texture::from_bytes(&glib::Bytes::from_static(l))) {
+          Some(Ok(texture)) => {
             let icon = Image::from_paintable(Some(&texture));
             icon.set_pixel_size(28);
             icon.set_halign(gtk4::Align::Center);
             icon.set_valign(gtk4::Align::Center);
             ring_overlay.add_overlay(&icon);
+          }
+          other => {
+            if let Some(Err(e)) = other {
+                tracing::warn!("No se pudo cargar el logo: {}", e);
+            }
+            // Sin logo: la inicial del provider
+            let initial: String = data.borrow().display_name.chars().take(1).collect();
+            let letter = Label::new(None);
+            letter.set_markup(&format!("<span size='x-large' weight='bold'>{}</span>", glib::markup_escape_text(&initial)));
+            letter.set_widget_name("provider-title");
+            letter.set_halign(gtk4::Align::Center);
+            letter.set_valign(gtk4::Align::Center);
+            ring_overlay.add_overlay(&letter);
           }
         }
 
@@ -128,29 +141,34 @@ impl ProviderCardWidgets {
                 .unwrap_or("No disponible");
             self.short_label.set_text(msg);
             self.weekly_label.set_text("");
+            self.bar_area.set_visible(true);
             self.ring_area.queue_draw();
             self.bar_area.queue_draw();
             return;
         }
 
-        // Texto del límite corto (5h)
+        // Texto del límite corto (aro)
         if let Some(short) = &current.short_limit {
             self.short_label.set_markup(&format!(
-                "<span size='small' weight='bold'>{:.0}%</span> <span size='x-small' alpha='70%'>5h</span>",
-                short.remaining_percent
+                "<span size='small' weight='bold'>{:.0}%</span> <span size='x-small' alpha='70%'>{}</span>",
+                short.remaining_percent,
+                glib::markup_escape_text(&short.name)
             ));
         } else {
             self.short_label.set_text("—");
         }
 
-        // Texto del límite semanal
+        // Texto del límite semanal (barra); los providers sin él ocultan la barra
+        self.bar_area.set_visible(current.weekly_limit.is_some());
         if let Some(weekly) = &current.weekly_limit {
             self.weekly_label.set_markup(&format!(
-                "<span size='x-small' alpha='85%'>{:.0}% sem · {}</span>",
-                weekly.remaining_percent, weekly.reset_in_human
+                "<span size='x-small' alpha='85%'>{:.0}% {} · {}</span>",
+                weekly.remaining_percent,
+                glib::markup_escape_text(&weekly.name),
+                weekly.reset_in_human
             ));
         } else {
-            self.weekly_label.set_text("—");
+            self.weekly_label.set_text("");
         }
 
         // Solicitar a GTK que vuelva a invocar draw_func
