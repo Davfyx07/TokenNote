@@ -1,8 +1,10 @@
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::Arc;
 use gtk4::prelude::*;
 use gtk4::glib;
 use gtk4::Application;
+use tokio::sync::Notify;
 
 mod config;
 mod data;
@@ -59,20 +61,21 @@ fn build_ui(app: &Application) {
         }
     });
 
-    let (app_clone, window_clone) = (app.clone(), window.clone());
+    // Despierta al recolector cuando cambia la config de providers
+    let refresh = Arc::new(Notify::new());
+
+    let (app_clone, window_clone, refresh_clone) = (app.clone(), window.clone(), refresh.clone());
     glib::spawn_future_local(async move {
         while let Some(cmd) = tray_rx.recv().await {
             match cmd {
                 tray::TrayCmd::Toggle => window_clone.set_visible(!window_clone.is_visible()),
+                tray::TrayCmd::Settings => ui::settings::open(&app_clone, refresh_clone.clone()),
                 tray::TrayCmd::Quit => app_clone.quit(),
             }
         }
     });
 
     // Hilo recolector en segundo plano
-    let update_interval = std::time::Duration::from_secs(config.update_interval_secs);
-    let auto_refresh = config.auto_refresh_claude;
-
     std::thread::spawn(move || {
         let rt = match tokio::runtime::Builder::new_current_thread()
             .enable_all()
@@ -87,6 +90,8 @@ fn build_ui(app: &Application) {
 
         rt.block_on(async move {
             loop {
+                // Se relee cada vuelta para tomar los providers agregados en la configuración
+                let config = WidgetConfig::load();
                 tracing::info!("Consultando cuotas de uso...");
                 let mut providers = Vec::new();
 
@@ -100,14 +105,23 @@ fn build_ui(app: &Application) {
 
                 // 2. Consultar Claude (API Anthropic + auto-login)
                 if home.join(".claude").exists() {
-                    providers.push(data::claude::fetch_claude_usage(auto_refresh).await);
+                    providers.push(data::claude::fetch_claude_usage(config.auto_refresh_claude).await);
+                }
+
+                // 3. Providers agregados por el usuario (DeepSeek, OpenRouter, OpenCode)
+                for p in &config.providers {
+                    providers.push(data::fetch_configured(p).await);
                 }
 
                 if sender.send(providers).is_err() {
                     break;
                 }
 
-                tokio::time::sleep(update_interval).await;
+                let interval = std::time::Duration::from_secs(config.update_interval_secs);
+                tokio::select! {
+                    _ = tokio::time::sleep(interval) => {}
+                    _ = refresh.notified() => {}
+                }
             }
         });
     });

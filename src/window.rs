@@ -7,7 +7,7 @@ use gtk4_layer_shell::{Edge, KeyboardMode, Layer, LayerShell};
 use crate::config::WidgetConfig;
 
 const STYLES_CSS: &str = r#"
-window {
+window.overlay {
     background-color: transparent;
 }
 
@@ -41,6 +41,7 @@ pub fn create_overlay_window(app: &Application, config: &WidgetConfig) -> Applic
         .title("AI Usage Monitor")
         .decorated(false)
         .build();
+    window.add_css_class("overlay");
 
     // Configuración Layer-Shell
     window.init_layer_shell();
@@ -74,7 +75,11 @@ fn enable_drag(window: &ApplicationWindow, config: &WidgetConfig) {
     });
 
     drag.connect_drag_end(move |_, _, _| {
-        if let Err(e) = cfg.borrow().save() {
+        // Releer para no pisar cambios hechos desde la ventana de configuración
+        let mut fresh = WidgetConfig::load();
+        fresh.margin_top = cfg.borrow().margin_top;
+        fresh.margin_right = cfg.borrow().margin_right;
+        if let Err(e) = fresh.save() {
             tracing::warn!("No se pudo guardar la posición: {}", e);
         }
     });

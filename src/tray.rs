@@ -8,6 +8,7 @@ use crate::ui::ring::draw_usage_ring;
 
 pub enum TrayCmd {
     Toggle,
+    Settings,
     Quit,
 }
 
@@ -40,6 +41,15 @@ impl ksni::Tray for AppTray {
                 label: "Mostrar/Ocultar".into(),
                 activate: Box::new(|t: &mut Self| {
                     let _ = t.tx.send(TrayCmd::Toggle);
+                }),
+                ..Default::default()
+            }
+            .into(),
+            StandardItem {
+                label: "Configuración…".into(),
+                icon_name: "preferences-system".into(),
+                activate: Box::new(|t: &mut Self| {
+                    let _ = t.tx.send(TrayCmd::Settings);
                 }),
                 ..Default::default()
             }

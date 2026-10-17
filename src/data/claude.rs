@@ -137,7 +137,7 @@ pub async fn fetch_claude_usage(auto_refresh: bool) -> AiProviderUsage {
 
                             if item.kind == "weekly_all" {
                                 weekly_limit = Some(UsageLimit {
-                                    name: "Semanal".to_string(),
+                                    name: "sem".to_string(),
                                     used_percent: used,
                                     remaining_percent: remaining,
                                     resets_at,
@@ -145,7 +145,7 @@ pub async fn fetch_claude_usage(auto_refresh: bool) -> AiProviderUsage {
                                 });
                             } else if item.kind.contains("session") || item.kind.contains("5h") || item.kind.contains("prompt") {
                                 short_limit = Some(UsageLimit {
-                                    name: "Sesión 5h".to_string(),
+                                    name: "5h".to_string(),
                                     used_percent: used,
                                     remaining_percent: remaining,
                                     resets_at,
@@ -160,7 +160,7 @@ pub async fn fetch_claude_usage(auto_refresh: bool) -> AiProviderUsage {
                     if short_limit.is_none() && weekly_limit.is_some() {
                         let w = weekly_limit.as_ref().unwrap();
                         short_limit = Some(UsageLimit {
-                            name: "Activo".to_string(),
+                            name: "activo".to_string(),
                             used_percent: w.used_percent,
                             remaining_percent: w.remaining_percent,
                             resets_at: w.resets_at,
