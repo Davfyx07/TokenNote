@@ -45,19 +45,22 @@ fn build_ui(app: &Application) {
     // glib::MainContext::channel ya no existe en glib 0.20; el mpsc de tokio funciona en cualquier executor
     let (sender, mut receiver) = tokio::sync::mpsc::unbounded_channel::<Vec<AiProviderUsage>>();
 
+    // Icono de bandeja: mostrar/ocultar y salir; su aro indica el % restante más bajo
+    let (tray_tx, mut tray_rx) = tokio::sync::mpsc::unbounded_channel::<tray::TrayCmd>();
+    let tray_handle = tray::spawn(tray_tx);
+
     let view_clone = view.clone();
     glib::spawn_future_local(async move {
         while let Some(providers) = receiver.recv().await {
+            if let Some(handle) = &tray_handle {
+                tray::set_level(handle, tray::worst_remaining(&providers));
+            }
             view_clone.borrow_mut().update_providers(providers);
         }
     });
 
-    // Icono de bandeja: mostrar/ocultar y salir
-    let (tray_tx, mut tray_rx) = tokio::sync::mpsc::unbounded_channel::<tray::TrayCmd>();
-    let tray_handle = tray::spawn(tray_tx);
     let (app_clone, window_clone) = (app.clone(), window.clone());
     glib::spawn_future_local(async move {
-        let _tray_handle = tray_handle;
         while let Some(cmd) = tray_rx.recv().await {
             match cmd {
                 tray::TrayCmd::Toggle => window_clone.set_visible(!window_clone.is_visible()),
