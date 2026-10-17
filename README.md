@@ -7,6 +7,9 @@ Widget flotante para Wayland que muestra cuánto te queda de cuota en **Codex** 
 
 Solo aparecen las IAs que tengas instaladas (detecta `~/.codex` y `~/.claude`).
 
+- **Bandeja**: clic en el icono para mostrar/ocultar; menú con *Salir*.
+- **Mover**: arrastra el widget; la posición se guarda en la config.
+
 ## Requisitos
 
 - Un compositor Wayland con soporte de `wlr-layer-shell` (KDE Plasma, Hyprland, Sway…).
@@ -34,6 +37,6 @@ Se crea sola la primera vez en `~/.config/ai-usage-widget/config.json`:
 }
 ```
 
-- `margin_top` / `margin_right`: separación respecto a la esquina superior derecha.
+- `margin_top` / `margin_right`: separación respecto a la esquina superior derecha (se actualiza al arrastrar).
 - `update_interval_secs`: cada cuántos segundos se actualiza.
 - `auto_refresh_claude`: si el token de Claude está por vencer, lo renueva ejecutando `claude -p`.
